@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.ipynb_checkpoints/
+
+# Local data, caches, and generated analysis output
+*.duckdb
+*.duckdb.wal
+*.db
+*.sqlite
+data/
+results/
+notebooks/results/
+
+# Local editor/OS files
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
