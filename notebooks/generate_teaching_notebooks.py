@@ -7,6 +7,7 @@ cells stay consistent across the teaching sequence.
 from __future__ import annotations
 
 from pathlib import Path
+from textwrap import dedent
 
 import nbformat as nbf
 
@@ -15,11 +16,11 @@ NOTEBOOK_DIR = Path(__file__).resolve().parent / "teaching"
 
 
 def md(source: str) -> nbf.NotebookNode:
-    return nbf.v4.new_markdown_cell(source.strip())
+    return nbf.v4.new_markdown_cell(dedent(source).strip())
 
 
 def code(source: str) -> nbf.NotebookNode:
-    return nbf.v4.new_code_cell(source.strip())
+    return nbf.v4.new_code_cell(dedent(source).strip())
 
 
 DEPENDENCY_CELL = r"""
@@ -153,6 +154,10 @@ def common_setup_cells() -> list[nbf.NotebookNode]:
 
 def write_notebook(filename: str, cells: list[nbf.NotebookNode]) -> None:
     NOTEBOOK_DIR.mkdir(parents=True, exist_ok=True)
+    cell_id_prefix = Path(filename).stem.replace("_", "-")
+    for index, cell in enumerate(cells):
+        cell["id"] = f"{cell_id_prefix}-{index:02d}"
+
     notebook = nbf.v4.new_notebook(cells=cells)
     notebook.metadata["kernelspec"] = {
         "display_name": "Python 3",

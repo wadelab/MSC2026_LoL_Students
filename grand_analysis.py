@@ -8,6 +8,7 @@ analysis unit before averaging across servers.
 
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 from typing import Any
 
@@ -593,6 +594,8 @@ def load_pooled_significant_phases(
     """Load pooled phase values from server-metric files that pass the N threshold."""
 
     metrics = metrics or (PC_DENSITY_METRICS + ["DeltaMMR"])
+    phase_columns = ["metric", "platform", "phase_local_peak"]
+    inclusion_columns = ["metric", "platform", "n_phases", "included", "min_phases"]
     phase_rows = []
     inclusion_rows = []
 
@@ -624,7 +627,7 @@ def load_pooled_significant_phases(
                     }
                 )
 
-    return pd.DataFrame(phase_rows), pd.DataFrame(inclusion_rows)
+    return pd.DataFrame(phase_rows, columns=phase_columns), pd.DataFrame(inclusion_rows, columns=inclusion_columns)
 
 
 def pooled_circular_bimodality_tests(
@@ -1514,6 +1517,45 @@ def run_grand_analysis(
     }
 
 
-if __name__ == "__main__":
-    result = run_grand_analysis()
+def parse_args() -> argparse.Namespace:
+    """Parse command-line options for standalone grand-analysis runs."""
+
+    parser = argparse.ArgumentParser(
+        description="Build the across-server GRAND report from existing per-server outputs."
+    )
+    parser.add_argument(
+        "--output-root",
+        default="results",
+        help="Folder containing per-server result folders. Defaults to results.",
+    )
+    parser.add_argument(
+        "--platform",
+        action="append",
+        help=(
+            "Platform/server folder to include. Repeat this option to include several. "
+            "Defaults to the canonical analysis platform set."
+        ),
+    )
+    parser.add_argument(
+        "--keep-existing",
+        action="store_true",
+        help="Do not remove existing generated GRAND files before rerunning.",
+    )
+    return parser.parse_args()
+
+
+def main() -> int:
+    """Run the standalone grand-analysis command."""
+
+    args = parse_args()
+    result = run_grand_analysis(
+        output_root=args.output_root,
+        platforms=args.platform,
+        clean=not args.keep_existing,
+    )
     print(f"Grand analysis complete: {result['servers']} servers, {result['figures']} figures")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
