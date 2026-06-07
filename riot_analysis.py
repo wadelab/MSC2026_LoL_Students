@@ -75,7 +75,9 @@ GOOD_PCA_COLS = ["gold_per_min", "damdealt_per_min", "kills_per_min", "assists_p
 
 SERVER_RIOT_PARQUET = Path("/raid/data/riot/riotData.parquet")
 COLAB_RIOT_PARQUET = Path("/content/drive/Shareddrives/MSc_2026_Riot/db/riotData.parquet")
+COLAB_RIOT_DUCKDB = Path("/content/drive/Shareddrives/MSc_2026_Riot/db/riot_local.duckdb")
 RIOT_PARQUET_ENV_VARS = ("RIOT_DB_PATH", "RIOT_PARQUET_PATH")
+RIOT_DUCKDB_ENV_VAR = "RIOT_DUCKDB_PATH"
 
 
 @dataclass
@@ -216,6 +218,21 @@ def resolve_riot_parquet(parquet_file: str | Path | None = None, *, mount_drive:
     raise FileNotFoundError(message)
 
 
+def resolve_analysis_db_file(db_file: str | Path | None = None) -> Path:
+    """Choose a persistent DuckDB cache path, using shared Drive in Colab."""
+
+    if db_file is not None:
+        return Path(db_file).expanduser()
+
+    env_value = os.environ.get(RIOT_DUCKDB_ENV_VAR)
+    if env_value:
+        return Path(env_value).expanduser()
+
+    if running_in_colab():
+        return COLAB_RIOT_DUCKDB
+    return Path("riot_local.duckdb")
+
+
 def duckdb_string_literal(value: str | Path) -> str:
     """Return a single-quoted SQL literal for DuckDB path strings."""
 
@@ -320,12 +337,15 @@ def ensure_hourly_agg_table(
 def existing_database_is_usable(db_file: str | Path) -> bool:
     """Return True when an existing DuckDB has readable raw and aggregate relations."""
 
+    required_columns = {"platformid", "hour_idx", "n"} | {
+        col.lower() for col in AGG_COL_MAP.values()
+    }
     try:
         conn = duckdb.connect(str(db_file), read_only=True)
         try:
             conn.execute("SELECT 1 FROM riotData LIMIT 1").fetchone()
             conn.execute("SELECT 1 FROM hourly_agg LIMIT 1").fetchone()
-            return True
+            return required_columns.issubset(duckdb_relation_columns(conn, "hourly_agg"))
         finally:
             conn.close()
     except Exception:
@@ -333,18 +353,31 @@ def existing_database_is_usable(db_file: str | Path) -> bool:
 
 
 def connect_analysis_database(
-    db_file: str | Path = "riot_local.duckdb",
+    db_file: str | Path | None = None,
     *,
     parquet_file: str | Path | None = None,
     rebuild_hourly_agg: bool = False,
     read_only: bool = True,
     verbose: bool = True,
 ) -> duckdb.DuckDBPyConnection:
-    """Prepare and open the local DuckDB cache for the full analysis workflow."""
+    """Prepare and open the DuckDB cache for the full analysis workflow."""
 
-    db_path = Path(db_file).expanduser()
+    db_path = resolve_analysis_db_file(db_file)
+    drive_mounted = Path("/content/drive/MyDrive").exists() or Path("/content/drive/Shareddrives").exists()
+    if running_in_colab() and str(db_path).startswith("/content/drive/") and not drive_mounted:
+        mount_colab_drive()
     if db_path.parent != Path("."):
         db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if (
+        parquet_file is None
+        and not rebuild_hourly_agg
+        and db_path.exists()
+        and existing_database_is_usable(db_path)
+    ):
+        if verbose:
+            print(f"Using existing DuckDB cache without rebuilding: {db_path}", flush=True)
+        return duckdb.connect(str(db_path), read_only=read_only)
 
     try:
         parquet_path = resolve_riot_parquet(parquet_file)
@@ -370,10 +403,10 @@ def connect_analysis_database(
     return duckdb.connect(str(db_path), read_only=read_only)
 
 
-def connect_read_only(db_file: str | Path = "riot_local.duckdb") -> duckdb.DuckDBPyConnection:
-    """Open the local DuckDB analysis file in read-only mode."""
+def connect_read_only(db_file: str | Path | None = None) -> duckdb.DuckDBPyConnection:
+    """Open the resolved DuckDB analysis cache in read-only mode."""
 
-    return duckdb.connect(str(db_file), read_only=True)
+    return duckdb.connect(str(resolve_analysis_db_file(db_file)), read_only=True)
 
 
 def available_platforms(conn: duckdb.DuckDBPyConnection) -> list[str]:

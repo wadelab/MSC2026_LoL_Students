@@ -60,8 +60,11 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run LoL rhythm analyses by server.")
     parser.add_argument(
         "--duckdb-file",
-        default="riot_local.duckdb",
-        help="Path to the local DuckDB cache file. It is created or refreshed from the raw Parquet when needed.",
+        default=None,
+        help=(
+            "Path to the DuckDB cache file. Defaults to RIOT_DUCKDB_PATH, "
+            "the shared Drive cache in Colab, or riot_local.duckdb locally."
+        ),
     )
     parser.add_argument(
         "--parquet-file",

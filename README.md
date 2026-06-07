@@ -69,13 +69,25 @@ By default the scripts look for the Parquet data in this order:
 /content/drive/Shareddrives/MSc_2026_Riot/db/riotData.parquet
 ```
 
-The local DuckDB file is only a rebuildable cache/pointer file. It stores the
-`riotData` view and the materialized `hourly_agg` table used by the analysis.
-It is created or refreshed automatically at:
+The DuckDB file is a rebuildable cache/pointer file. It stores the `riotData`
+view and the materialized `hourly_agg` table used by the analysis. Locally it
+is created or refreshed automatically at:
 
 ```text
 riot_local.duckdb
 ```
+
+In Colab, notebooks instead persist and reuse the cache on the shared Google
+Drive:
+
+```text
+/content/drive/Shareddrives/MSc_2026_Riot/db/riot_local.duckdb
+```
+
+The first Colab run builds this shared cache. Later sessions open a valid cache
+read-only and skip rebuilding `hourly_agg`. Set `RIOT_DUCKDB_PATH` before
+running setup to use a personal Drive cache or another location instead. Avoid
+forcing a rebuild while another notebook is using the shared cache.
 
 Generated DuckDB/WAL files are ignored by git.
 

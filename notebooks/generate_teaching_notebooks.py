@@ -123,12 +123,17 @@ if ROOT is None:
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from riot_analysis import resolve_analysis_db_file
+
+ANALYSIS_DB_FILE = resolve_analysis_db_file() if IN_COLAB else ROOT / "riot_local.duckdb"
+
 pd.set_option("display.max_columns", 100)
 pd.set_option("display.width", 160)
 plt.rcParams["figure.dpi"] = 120
 
 print(f"Repository root: {ROOT}")
 print(f"Running in Colab: {IN_COLAB}")
+print(f"Persistent DuckDB cache: {ANALYSIS_DB_FILE}")
 """
 
 
@@ -141,6 +146,9 @@ def common_setup_cells() -> list[nbf.NotebookNode]:
             In Colab, the notebook mounts Google Drive and looks for the raw Riot
             Parquet at the same shared-drive path used by the other release
             notebooks: `/content/drive/Shareddrives/MSc_2026_Riot/db/riotData.parquet`.
+            The materialized `hourly_agg` cache is stored beside it as
+            `riot_local.duckdb`. The first run creates the cache; later Colab
+            sessions reuse it without rebuilding the aggregate table.
 
             The notebook also needs the repository Python files. If they are not
             already present in the runtime or Drive, the setup cell tries to clone
@@ -199,7 +207,7 @@ def hourly_activity_notebook() -> list[nbf.NotebookNode]:
             configure_plot_style()
 
             PLATFORM = "EUW1"
-            DB_FILE = ROOT / "riot_local.duckdb"
+            DB_FILE = ANALYSIS_DB_FILE
             PARQUET_FILE = None  # Auto-detects RIOT_DB_PATH, this server, or the Colab shared Drive path.
             REBUILD_HOURLY_AGG = False
 
@@ -374,7 +382,7 @@ def pca_notebook() -> list[nbf.NotebookNode]:
             configure_plot_style()
 
             PLATFORM = "EUW1"
-            DB_FILE = ROOT / "riot_local.duckdb"
+            DB_FILE = ANALYSIS_DB_FILE
             PARQUET_FILE = None
 
             config = AnalysisConfig(platform=PLATFORM, max_hour_limit=10000, output_root=ROOT / "results")
@@ -559,7 +567,7 @@ def pc_periodogram_notebook() -> list[nbf.NotebookNode]:
             configure_plot_style()
 
             PLATFORM = "EUW1"
-            DB_FILE = ROOT / "riot_local.duckdb"
+            DB_FILE = ANALYSIS_DB_FILE
             PARQUET_FILE = None
 
             config = AnalysisConfig(
@@ -723,7 +731,7 @@ def mean_vs_player_periodogram_notebook() -> list[nbf.NotebookNode]:
 
             PLATFORM = "EUW1"
             TOP_N_PLAYERS = 250
-            DB_FILE = ROOT / "riot_local.duckdb"
+            DB_FILE = ANALYSIS_DB_FILE
             PARQUET_FILE = None
 
             config = AnalysisConfig(

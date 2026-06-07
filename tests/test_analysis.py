@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 import duckdb
 import numpy as np
@@ -8,7 +11,16 @@ import pandas as pd
 from scipy.stats import vonmises
 
 from grand_analysis import ANALYSIS_PLATFORMS
-from riot_analysis import AnalysisConfig, fit_vonmises_2comp, load_hourly_win_rate, load_top_players
+from riot_analysis import (
+    AGG_COL_MAP,
+    AnalysisConfig,
+    COLAB_RIOT_DUCKDB,
+    connect_analysis_database,
+    fit_vonmises_2comp,
+    load_hourly_win_rate,
+    load_top_players,
+    resolve_analysis_db_file,
+)
 from server_timezones import utc_ms_to_local_datetime
 
 
@@ -21,6 +33,45 @@ class AnalysisTests(unittest.TestCase):
         self.assertNotIn("TR1", ANALYSIS_PLATFORMS)
         self.assertNotIn("ID1", ANALYSIS_PLATFORMS)
         self.assertNotIn("PBE1", ANALYSIS_PLATFORMS)
+
+    def test_duckdb_path_can_be_overridden_for_drive_cache(self) -> None:
+        expected = Path("/content/drive/MyDrive/lol/riot_local.duckdb")
+        with patch.dict("os.environ", {"RIOT_DUCKDB_PATH": str(expected)}):
+            self.assertEqual(resolve_analysis_db_file(), expected)
+
+    def test_colab_defaults_to_shared_drive_cache(self) -> None:
+        with (
+            patch.dict("os.environ", {}, clear=True),
+            patch("riot_analysis.running_in_colab", return_value=True),
+        ):
+            self.assertEqual(resolve_analysis_db_file(), COLAB_RIOT_DUCKDB)
+
+    def test_valid_existing_cache_is_reused_without_parquet_resolution(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "riot_local.duckdb"
+            conn = duckdb.connect(str(db_path))
+            conn.execute("CREATE TABLE riotData (value INTEGER)")
+            aggregate_columns = ", ".join(
+                f"{column} DOUBLE" for column in sorted(set(AGG_COL_MAP.values()))
+            )
+            conn.execute(
+                f"CREATE TABLE hourly_agg (platformid VARCHAR, hour_idx BIGINT, "
+                f"n BIGINT, {aggregate_columns})"
+            )
+            conn.execute("INSERT INTO riotData VALUES (1)")
+            conn.execute(
+                f"INSERT INTO hourly_agg VALUES ('EUW1', 1, 1, "
+                + ", ".join(["1"] * len(set(AGG_COL_MAP.values())))
+                + ")"
+            )
+            conn.close()
+
+            with patch("riot_analysis.resolve_riot_parquet", side_effect=AssertionError):
+                reused = connect_analysis_database(db_path, verbose=False)
+            try:
+                self.assertEqual(reused.execute("SELECT COUNT(*) FROM hourly_agg").fetchone()[0], 1)
+            finally:
+                reused.close()
 
     def test_fixed_offset_datetime_has_correct_timezone(self) -> None:
         scalar = utc_ms_to_local_datetime(0, "EUW1")
