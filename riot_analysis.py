@@ -85,7 +85,7 @@ class AnalysisConfig:
     platform: str
     target_col: str = "TIMEPLAYED"
     top_n_players: int = 1000
-    max_hour_limit: int = 5000
+    max_hour_limit: int = 10000
     min_period_h: float = 6.0
     max_period_h: float = 48.0
     period_step_h: float = 1.0
@@ -631,7 +631,7 @@ def load_hourly_win_rate(
         SELECT
             hour_idx,
             AVG(win_flag) AS win_rate,
-            COUNT(win_flag) AS n_win_games
+            COUNT(win_flag) AS n_win_records
         FROM game_wins
         WHERE win_flag IS NOT NULL
         GROUP BY hour_idx
@@ -740,19 +740,31 @@ def load_top_players(
     conn: duckdb.DuckDBPyConnection,
     platform: str,
     top_n_players: int,
+    *,
+    min_hour_idx: int | None = None,
+    max_hour_idx: int | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Load top players by game count and all their game rows."""
+    """Load top players and their player-match rows within an optional hour window."""
+
+    time_filter = ""
+    time_params: list[float] = []
+    if min_hour_idx is not None:
+        time_filter += " AND TRY_CAST(TIMESTAMP AS DOUBLE) >= ?"
+        time_params.append(float(min_hour_idx) * 3600000.0)
+    if max_hour_idx is not None:
+        time_filter += " AND TRY_CAST(TIMESTAMP AS DOUBLE) < ?"
+        time_params.append(float(max_hour_idx + 1) * 3600000.0)
 
     top_players = conn.execute(
-        """
+        f"""
         SELECT ACCOUNTID, COUNT(*) AS game_count
         FROM riotData
-        WHERE PLATFORMID = ? AND ACCOUNTID IS NOT NULL
+        WHERE PLATFORMID = ? AND ACCOUNTID IS NOT NULL{time_filter}
         GROUP BY ACCOUNTID
         ORDER BY game_count DESC
         LIMIT ?;
         """,
-        [platform, int(top_n_players)],
+        [platform] + time_params + [int(top_n_players)],
     ).df()
 
     if top_players.empty:
@@ -764,10 +776,10 @@ def load_top_players(
         f"""
         SELECT *
         FROM riotData
-        WHERE PLATFORMID = ? AND ACCOUNTID IN ({placeholders})
+        WHERE PLATFORMID = ? AND ACCOUNTID IN ({placeholders}){time_filter}
         ORDER BY ACCOUNTID, TIMESTAMP;
         """,
-        [platform] + account_ids,
+        [platform] + account_ids + time_params,
     ).df()
     return top_players, add_delta_mmr(player_data)
 
@@ -1034,10 +1046,16 @@ def fit_vonmises_2comp(theta_vals: np.ndarray, max_iter: int = 200, tol: float =
         kappa2 = max(1e-4, _kappa_from_rbar(rbar2))
 
         if np.abs(next_loglik - loglik) < tol:
-            loglik = next_loglik
             break
         loglik = next_loglik
 
+    final_mix = np.clip(
+        pi1 * vonmises.pdf(theta_vals, kappa1, loc=mu1)
+        + (1 - pi1) * vonmises.pdf(theta_vals, kappa2, loc=mu2),
+        1e-300,
+        None,
+    )
+    loglik = float(np.sum(np.log(final_mix)))
     bic = float(5 * np.log(n) - 2 * loglik)
     return {
         "pi1": pi1,
@@ -1122,8 +1140,8 @@ def plot_win_rate(
         rows.append(
             {
                 "local_hour": local_hour,
-                "win_rate": np.average(group["win_rate"], weights=group["n_win_games"]),
-                "n_win_games": group["n_win_games"].sum(),
+                "win_rate": np.average(group["win_rate"], weights=group["n_win_records"]),
+                "n_win_records": group["n_win_records"].sum(),
             }
         )
     local_win = pd.DataFrame(rows).set_index("local_hour").reindex(range(24)).reset_index()
@@ -1400,7 +1418,7 @@ def run_platform_analysis(conn: duckdb.DuckDBPyConnection, config: AnalysisConfi
     win_fit = fixed_period_lag_table(
         hourly_win["hour_idx"].to_numpy(dtype=float) - hourly_win["hour_idx"].min(),
         hourly_win["win_rate"].to_numpy(dtype=float),
-        weights=hourly_win["n_win_games"].to_numpy(dtype=float),
+        weights=hourly_win["n_win_records"].to_numpy(dtype=float),
         robust=True,
     )
     plot_win_rate(hourly_win, win_periodogram, win_fit, config, output_dir)
@@ -1421,7 +1439,7 @@ def run_platform_analysis(conn: duckdb.DuckDBPyConnection, config: AnalysisConfi
     summary["performance_pc2_explained"] = float(pca["explained"][1])
     summary["performance_pc3_explained"] = float(pca["explained"][2])
 
-    success_input = hourly_metrics.merge(hourly_win[["hour_idx", "win_rate", "n_win_games"]], on="hour_idx", how="inner")
+    success_input = hourly_metrics.merge(hourly_win[["hour_idx", "win_rate", "n_win_records"]], on="hour_idx", how="inner")
     success_cols = numeric_cols + ["win_rate"]
     success_pca = compute_pca(success_input, success_cols, GOOD_PCA_COLS + ["win_rate"])
     success_loadings = success_pca["loadings"]
@@ -1434,7 +1452,13 @@ def run_platform_analysis(conn: duckdb.DuckDBPyConnection, config: AnalysisConfi
     summary["success_pc2_win_rate_loading"] = float(success_loadings.loc["PC2", "win_rate"])
     summary["success_pc3_win_rate_loading"] = float(success_loadings.loc["PC3", "win_rate"])
 
-    top_players, player_data = load_top_players(conn, config.platform, config.top_n_players)
+    top_players, player_data = load_top_players(
+        conn,
+        config.platform,
+        config.top_n_players,
+        min_hour_idx=int(hourly["hour_idx"].min()),
+        max_hour_idx=int(hourly["hour_idx"].max()),
+    )
     save_table(top_players, output_dir / f"top_players_{config.platform}.csv")
     if player_data.empty:
         raise RuntimeError(f"No player rows found for {config.platform}.")

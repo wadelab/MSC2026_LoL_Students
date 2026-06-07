@@ -35,10 +35,23 @@ jupyter lab
 The `.venv/` directory is created locally by `uv` and ignored by git. The
 versioned environment files are `pyproject.toml` and `uv.lock`.
 
+Run the focused regression checks:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
 ## Data
 
 The full rerun needs the raw Riot Parquet data. This large file is not included
 in git.
+
+Each raw row is one sampled player-account's record for one match. It is not a
+complete ten-player match record. Accordingly, hourly `n` values and win-rate
+weights count player-match records; they must not be interpreted as counts of
+unique games. The anonymized account IDs also cannot establish that each
+account belongs to a different person; output labels that say "player" should
+be read as "player account."
 
 By default the scripts look for the Parquet data in this order:
 
@@ -71,6 +84,15 @@ To force a rebuild of the hourly aggregate cache from the raw Parquet:
 ```bash
 python Parquet_longerAnalyses_May_26.py --rebuild-hourly-agg
 ```
+
+The default `--max-hour-limit 10000` covers the full observed 2016 season for
+all platforms in the current dataset. Reducing this option also restricts the
+selected-player analyses to the same time window.
+
+Full script runs default to the canonical eight-platform analysis set:
+`BR1`, `EUN1`, `EUW1`, `JP1`, `LA1`, `LA2`, `NA1`, and `OC1`. Other available
+platforms, including `TR1`, can still be selected explicitly with repeated
+`--platform` options.
 
 ## Recommended Student Path
 
@@ -111,6 +133,11 @@ listed above. If the repository files are not already available in the runtime,
 the setup cells try to clone this repository into `/content/`.
 
 ## Notes
+
+Platform-local hours use one documented fixed UTC offset per Riot platform.
+They are regional approximations and do not model daylight-saving transitions
+or individual player locations. Rhythm, PCA, and mixture-model outputs are
+exploratory summaries; they do not establish causal circadian effects.
 
 The concise notebook does not duplicate all of `riot_analysis.py`. Instead, it
 shows how the analysis is assembled from small reusable functions. This is the

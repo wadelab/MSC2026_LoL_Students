@@ -5,6 +5,7 @@ This uses one static UTC correction per server (no DST handling).
 
 from __future__ import annotations
 
+from datetime import timedelta, timezone
 from typing import Any
 
 import pandas as pd
@@ -84,13 +85,16 @@ def hour_idx_to_local_hour_of_day(hour_idx: Any, server: str) -> Any:
     return int(local)
 
 
-def utc_ms_to_local_datetime(utc_ms: Any, server: str) -> pd.Series:
+def utc_ms_to_local_datetime(utc_ms: Any, server: str) -> Any:
     """Convert UTC milliseconds since epoch to local datetime (fixed offset).
 
-    Returns timezone-aware UTC datetimes shifted by offset hours.
+    Returns timezone-aware datetimes using the server's fixed-offset timezone.
     """
     dt_utc = pd.to_datetime(utc_ms, unit="ms", utc=True)
-    return dt_utc + pd.to_timedelta(utc_offset_hours(server), unit="h")
+    fixed_timezone = timezone(timedelta(hours=utc_offset_hours(server)))
+    if isinstance(dt_utc, pd.Series):
+        return dt_utc.dt.tz_convert(fixed_timezone)
+    return dt_utc.tz_convert(fixed_timezone)
 
 
 def local_24h_cycle_mean(

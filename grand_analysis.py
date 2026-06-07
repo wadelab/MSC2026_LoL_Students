@@ -1,7 +1,7 @@
 """Across-server summary analysis for the League of Legends rhythm workflow.
 
 This module consumes the per-server outputs written by
-`Parquet_longerAnalyses_May_26.py` and builds a final meta-analysis in
+`Parquet_longerAnalyses_May_26.py` and builds a final across-server summary in
 `results/GRAND/`. It avoids re-querying DuckDB and keeps each server as one
 analysis unit before averaging across servers.
 """
@@ -26,11 +26,9 @@ from riot_analysis import COLORS, configure_plot_style, fit_vonmises_1comp, fit_
 
 GRAND_DIR_NAME = "GRAND"
 
-# Canonical server set for the grand analysis: the eight regions used by
-# published source-dataset reports (Aung et al. 2018; Vardal et al. 2022).
-# The remaining platforms (ID1, TR1, PBE1) are excluded as small / unreliable.
-# JP1 is retained; its spurious DeltaMMR period is still screened by
-# drop_period_outliers().
+# Canonical eight-platform set used by this workflow. Other available
+# platforms, including TR1, remain available when explicitly requested.
+# Period outliers are still screened by drop_period_outliers().
 ANALYSIS_PLATFORMS = ["BR1", "EUN1", "EUW1", "JP1", "LA1", "LA2", "NA1", "OC1"]
 
 COMPONENTS_TO_PLOT = ["PC1", "PC2", "PC3"]
@@ -149,7 +147,8 @@ def load_server_weights(server_dirs: list[Path]) -> pd.DataFrame:
         win_path = server_dir / "win_rate_by_local_hour.csv"
         if win_path.exists():
             win_rate = pd.read_csv(win_path)
-            row["server_n_win_games"] = float(win_rate["n_win_games"].sum())
+            count_col = "n_win_records" if "n_win_records" in win_rate else "n_win_games"
+            row["server_n_records"] = float(win_rate[count_col].sum())
 
         top_players_path = server_dir / f"top_players_{server_dir.name}.csv"
         if top_players_path.exists():
@@ -192,8 +191,8 @@ def weight_column_for_metric(metric: str, data: pd.DataFrame) -> str:
         return "pc2_circular_n"
     if metric_lower.startswith("deltammr_circular") and "deltammr_circular_n" in data:
         return "deltammr_circular_n"
-    if "server_n_win_games" in data:
-        return "server_n_win_games"
+    if "server_n_records" in data:
+        return "server_n_records"
     if "server_top_player_games" in data:
         return "server_top_player_games"
     return ""
@@ -255,15 +254,15 @@ def summarize_loadings(loadings: pd.DataFrame, server_summary: pd.DataFrame) -> 
     if loadings.empty:
         return pd.DataFrame()
 
-    weight_cols = ["platform", "server_n_win_games"]
+    weight_cols = ["platform", "server_n_records"]
     weights = server_summary[[col for col in weight_cols if col in server_summary.columns]].drop_duplicates("platform")
     loadings = loadings.merge(weights, on="platform", how="left")
-    loadings["server_n_win_games"] = loadings["server_n_win_games"].fillna(1.0)
+    loadings["server_n_records"] = loadings["server_n_records"].fillna(1.0)
 
     value_cols = [col for col in loadings.columns if col not in {"platform", "component"}]
     value_cols = [col for col in value_cols if not col.startswith("server_")]
     long = loadings.melt(
-        id_vars=["platform", "component", "server_n_win_games"],
+        id_vars=["platform", "component", "server_n_records"],
         value_vars=value_cols,
         var_name="feature",
         value_name="loading",
@@ -271,13 +270,13 @@ def summarize_loadings(loadings: pd.DataFrame, server_summary: pd.DataFrame) -> 
 
     rows = []
     for (component, feature), group in long.groupby(["component", "feature"]):
-        stats = weighted_stats(group["loading"], group["server_n_win_games"])
+        stats = weighted_stats(group["loading"], group["server_n_records"])
         rows.append(
             {
                 "component": component,
                 "feature": feature,
                 "n_servers": stats["n"],
-                "weight_col": "server_n_win_games",
+                "weight_col": "server_n_records",
                 "weight_sum": stats["weight_sum"],
                 "weighted_mean_loading": stats["mean"],
                 "weighted_sd_loading": stats["sd"],
@@ -297,6 +296,8 @@ def load_local_win_rates(server_dirs: list[Path]) -> pd.DataFrame:
         if not path.exists():
             continue
         win_rate = pd.read_csv(path)
+        if "n_win_records" not in win_rate and "n_win_games" in win_rate:
+            win_rate = win_rate.rename(columns={"n_win_games": "n_win_records"})
         win_rate.insert(0, "platform", server_dir.name)
         mean = win_rate["win_rate"].mean()
         sd = win_rate["win_rate"].std(ddof=0)
@@ -311,27 +312,27 @@ def load_local_win_rates(server_dirs: list[Path]) -> pd.DataFrame:
 
 
 def summarize_local_win_rates(local_win: pd.DataFrame) -> pd.DataFrame:
-    """Average local-hour win-rate curves with game-count weights."""
+    """Average local-hour win-rate curves with player-match-record weights."""
 
     if local_win.empty:
         return pd.DataFrame()
 
     rows = []
     for local_hour, group in local_win.groupby("local_hour"):
-        weights = group["n_win_games"].to_numpy(dtype=float)
+        weights = group["n_win_records"].to_numpy(dtype=float)
         z_stats = weighted_stats(group["win_rate_z"], weights)
         raw_stats = weighted_stats(group["win_rate"], weights)
         rows.append(
             {
                 "local_hour": int(local_hour),
                 "n_servers": z_stats["n"],
-                "weight_col": "n_win_games",
+                "weight_col": "n_win_records",
                 "weight_sum": z_stats["weight_sum"],
                 "weighted_win_rate_z": z_stats["mean"],
                 "weighted_sem_win_rate_z": z_stats["sem"],
                 "weighted_win_rate": raw_stats["mean"],
                 "weighted_sem_win_rate": raw_stats["sem"],
-                "n_win_games": int(group["n_win_games"].sum()),
+                "n_win_records": int(group["n_win_records"].sum()),
             }
         )
     return pd.DataFrame(rows).sort_values("local_hour").reset_index(drop=True)
@@ -745,7 +746,7 @@ def plot_grand_win_rate(local_summary: pd.DataFrame, output_path: Path) -> None:
     ax.axhline(0.0, color=COLORS["muted"], linestyle="--", linewidth=1.1)
     ax.set_title("Mean Local-Hour Win-Rate Shape")
     ax.set_xlabel("Local hour")
-    ax.set_ylabel("Game-count weighted z-scored win rate")
+    ax.set_ylabel("Record-count weighted z-scored win rate")
     ax.set_xticks(np.arange(0, 24, 2))
     style_axes(ax, grid_axis="y")
 
@@ -756,7 +757,7 @@ def plot_grand_win_rate(local_summary: pd.DataFrame, output_path: Path) -> None:
         color=COLORS["accent"],
         marker="o",
         linewidth=2.2,
-        label="Game-count weighted",
+        label="Record-count weighted",
     )
     ax.set_title("Raw Win Rate by Local Hour")
     ax.set_xlabel("Local hour")
@@ -1129,7 +1130,7 @@ def write_grand_markdown(
         "",
         f"Servers included: {len(server_summary)}",
         "",
-        "This is an across-server meta-analysis. Server-level outputs are summarized first, then combined with metric-specific N weights.",
+        "This is an across-server descriptive summary. Server-level outputs are summarized first, then combined with metric-specific N weights.",
         "",
         "## Key N-Weighted Server Metrics",
         "",

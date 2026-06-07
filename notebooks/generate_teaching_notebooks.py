@@ -206,7 +206,7 @@ def hourly_activity_notebook() -> list[nbf.NotebookNode]:
             config = AnalysisConfig(
                 platform=PLATFORM,
                 target_col="TIMEPLAYED",
-                max_hour_limit=5000,
+                max_hour_limit=10000,
                 output_root=ROOT / "results",
             )
 
@@ -377,7 +377,7 @@ def pca_notebook() -> list[nbf.NotebookNode]:
             DB_FILE = ROOT / "riot_local.duckdb"
             PARQUET_FILE = None
 
-            config = AnalysisConfig(platform=PLATFORM, max_hour_limit=5000, output_root=ROOT / "results")
+            config = AnalysisConfig(platform=PLATFORM, max_hour_limit=10000, output_root=ROOT / "results")
             conn = connect_analysis_database(DB_FILE, parquet_file=PARQUET_FILE)
             """
         ),
@@ -564,7 +564,7 @@ def pc_periodogram_notebook() -> list[nbf.NotebookNode]:
 
             config = AnalysisConfig(
                 platform=PLATFORM,
-                max_hour_limit=5000,
+                max_hour_limit=10000,
                 min_period_h=6,
                 max_period_h=48,
                 period_step_h=0.25,
@@ -729,7 +729,7 @@ def mean_vs_player_periodogram_notebook() -> list[nbf.NotebookNode]:
             config = AnalysisConfig(
                 platform=PLATFORM,
                 top_n_players=TOP_N_PLAYERS,
-                max_hour_limit=5000,
+                max_hour_limit=10000,
                 min_period_h=6,
                 max_period_h=48,
                 player_period_step_h=0.5,
@@ -756,7 +756,13 @@ def mean_vs_player_periodogram_notebook() -> list[nbf.NotebookNode]:
             hourly_metrics = filter_metric_outliers(hourly_metrics, numeric_cols)
             pca = compute_pca(hourly_metrics, numeric_cols, GOOD_PCA_COLS)
 
-            top_players, player_data = load_top_players(conn, PLATFORM, TOP_N_PLAYERS)
+            top_players, player_data = load_top_players(
+                conn,
+                PLATFORM,
+                TOP_N_PLAYERS,
+                min_hour_idx=int(hourly_metrics["hour_idx"].min()),
+                max_hour_idx=int(hourly_metrics["hour_idx"].max()),
+            )
             player_data = project_player_pca(player_data, numeric_cols, pca)
             player_data["TIMESTAMP"] = pd.to_numeric(player_data["TIMESTAMP"], errors="coerce")
             player_data["hour_idx"] = np.floor(player_data["TIMESTAMP"] / 3600000.0)

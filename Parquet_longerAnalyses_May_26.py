@@ -1,6 +1,6 @@
 """Run the League of Legends rhythm analysis outside the notebook.
 
-By default this script runs the original 8 Aung et al. platforms found in
+By default this script runs the canonical eight analysis platforms found in
 `hourly_agg` and writes outputs to separate folders under `results/`, for
 example `results/EUW1/`. The reusable functions live in `riot_analysis.py`
 so the notebook and script workflow can share the same analysis logic.
@@ -77,7 +77,7 @@ def parse_args() -> argparse.Namespace:
         action="append",
         help=(
             "Platform/server to run. Repeat this option to run several. "
-            "Defaults to the original 8 Aung et al. servers."
+            "Defaults to the canonical eight-platform analysis set."
         ),
     )
     parser.add_argument(
@@ -93,7 +93,12 @@ def parse_args() -> argparse.Namespace:
         default=1000,
         help="Top players per server for within-subject analyses.",
     )
-    parser.add_argument("--max-hour-limit", type=int, default=5000, help="Maximum hourly span to analyze per server.")
+    parser.add_argument(
+        "--max-hour-limit",
+        type=int,
+        default=10000,
+        help="Maximum hourly span to analyze per server. The default covers the full 2016 dataset.",
+    )
     parser.add_argument("--n-jobs", type=int, default=default_n_jobs(), help="Parallel workers for player analyses.")
     parser.add_argument(
         "--keep-existing",
