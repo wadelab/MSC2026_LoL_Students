@@ -57,6 +57,8 @@ else:
 
 PATH_CELL = r"""
 from pathlib import Path
+import importlib
+import os
 import subprocess
 import sys
 
@@ -84,6 +86,7 @@ if IN_COLAB:
 # Override this if your repository folder has a different Colab/Drive location.
 ROOT_OVERRIDE = None
 REPO_URL = "https://github.com/wadelab/MSC2026_LoL_Students.git"
+COLAB_REPO = Path(os.environ.get("LOL_REPO_PATH", "/content/MSC2026_LoL_Students"))
 
 
 def find_repo_root() -> Path | None:
@@ -97,7 +100,7 @@ def find_repo_root() -> Path | None:
     candidates.insert(0, Path.cwd().resolve())
     candidates.extend(
         [
-            Path("/content/MSC2026_LoL_Students"),
+            COLAB_REPO,
             Path("/content/drive/MyDrive/MSC2026_LoL_Students"),
             Path("/content/drive/Shareddrives/MSc_2026_Riot/MSC2026_LoL_Students"),
         ]
@@ -109,19 +112,32 @@ def find_repo_root() -> Path | None:
 
 
 ROOT = find_repo_root()
-if ROOT is None and IN_COLAB:
-    clone_target = Path("/content/MSC2026_LoL_Students")
-    if not clone_target.exists():
-        subprocess.run(["git", "clone", "--depth", "1", REPO_URL, str(clone_target)], check=True)
-    ROOT = find_repo_root()
+if IN_COLAB:
+    if (COLAB_REPO / ".git").exists():
+        print("Updating Colab repository clone...")
+        subprocess.run(["git", "-C", str(COLAB_REPO), "pull", "--ff-only"], check=True)
+    elif not COLAB_REPO.exists():
+        print("Cloning repository files needed by the notebook...")
+        subprocess.run(["git", "clone", "--depth", "1", REPO_URL, str(COLAB_REPO)], check=True)
+    elif not (COLAB_REPO / "riot_analysis.py").exists():
+        raise FileNotFoundError(
+            f"{COLAB_REPO} exists but is not a usable repository clone. "
+            "Remove or rename it, then rerun this setup cell."
+        )
+    if ROOT_OVERRIDE is None:
+        ROOT = COLAB_REPO.resolve()
+    else:
+        ROOT = find_repo_root()
 
-if ROOT is None:
+if ROOT is None or not (ROOT / "riot_analysis.py").exists():
     raise FileNotFoundError(
-        "Could not find riot_analysis.py. Set ROOT_OVERRIDE to the repository folder."
+        "Could not find riot_analysis.py after repository setup. "
+        "Set ROOT_OVERRIDE to a complete repository folder."
     )
 
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+importlib.invalidate_caches()
 
 from riot_analysis import resolve_analysis_db_file
 
@@ -132,6 +148,7 @@ pd.set_option("display.width", 160)
 plt.rcParams["figure.dpi"] = 120
 
 print(f"Repository root: {ROOT}")
+print(f"riot_analysis.py: {ROOT / 'riot_analysis.py'}")
 print(f"Running in Colab: {IN_COLAB}")
 print(f"Persistent DuckDB cache: {ANALYSIS_DB_FILE}")
 """
@@ -152,11 +169,11 @@ def common_setup_cells() -> list[nbf.NotebookNode]:
 
             The notebook also needs the repository Python files. If they are not
             already present in the runtime or Drive, the setup cell tries to clone
-            the student repository into `/content/MSC2026_LoL_Students`.
+            the student repository into `/content/MSC2026_LoL_Students`. Run the
+            single setup code cell below before any analysis cell.
             """
         ),
-        code(DEPENDENCY_CELL),
-        code(PATH_CELL),
+        code(DEPENDENCY_CELL + "\n\n" + PATH_CELL),
     ]
 
 

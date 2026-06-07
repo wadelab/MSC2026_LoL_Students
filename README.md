@@ -144,6 +144,13 @@ In Colab, the notebooks mount Google Drive and use the shared Parquet path
 listed above. If the repository files are not already available in the runtime,
 the setup cells try to clone this repository into `/content/`.
 
+When opening a focused notebook directly in Colab, run its single **Setup**
+code cell before any analysis cell. That cell clones or updates
+`/content/MSC2026_LoL_Students`, adds it to `sys.path`, and prints the resolved
+path to `riot_analysis.py`. If that clone location conflicts with another
+folder, set `LOL_REPO_PATH` to a fresh `/content/...` path before rerunning
+setup.
+
 ## Notes
 
 Platform-local hours use one documented fixed UTC offset per Riot platform.
