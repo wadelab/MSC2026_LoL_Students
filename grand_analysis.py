@@ -9,6 +9,7 @@ analysis unit before averaging across servers.
 from __future__ import annotations
 
 import argparse
+from html import escape
 from pathlib import Path
 from typing import Any
 
@@ -21,7 +22,15 @@ import numpy as np
 import pandas as pd
 from scipy.stats import vonmises
 
-from riot_analysis import COLORS, configure_plot_style, fit_vonmises_1comp, fit_vonmises_2comp, save_table, style_axes
+from riot_analysis import (
+    COLORS,
+    configure_plot_style,
+    fit_vonmises_1comp,
+    fit_vonmises_2comp,
+    save_figure,
+    save_table,
+    style_axes,
+)
 
 
 GRAND_DIR_NAME = "GRAND"
@@ -110,7 +119,7 @@ def clean_grand_outputs(grand_dir: Path) -> None:
 
     if not grand_dir.exists():
         return
-    for pattern in ("*.png", "*.csv", "*.md", "*.html"):
+    for pattern in ("*.png", "*.svg", "*.csv", "*.md", "*.html"):
         for path in grand_dir.glob(pattern):
             path.unlink()
 
@@ -725,7 +734,7 @@ def plot_grand_loadings(loadings_summary: pd.DataFrame, title: str, output_path:
 
     fig.suptitle(title, fontsize=13.5, fontweight="bold", color=COLORS["ink"])
     fig.tight_layout()
-    fig.savefig(output_path, dpi=220, bbox_inches="tight")
+    save_figure(fig, output_path)
     plt.close(fig)
 
 
@@ -768,7 +777,7 @@ def plot_grand_win_rate(local_summary: pd.DataFrame, output_path: Path) -> None:
 
     fig.suptitle("Grand N-Weighted Local-Hour Win-Rate Analysis", fontsize=13.5, fontweight="bold", color=COLORS["ink"])
     fig.tight_layout()
-    fig.savefig(output_path, dpi=220, bbox_inches="tight")
+    save_figure(fig, output_path)
     plt.close(fig)
 
 
@@ -833,7 +842,7 @@ def plot_pc_peak_densities(density_summary: pd.DataFrame, output_path: Path) -> 
         color=COLORS["ink"],
     )
     fig.tight_layout()
-    fig.savefig(output_path, dpi=220, bbox_inches="tight")
+    save_figure(fig, output_path)
     plt.close(fig)
 
 
@@ -957,7 +966,7 @@ def plot_pooled_circular_bimodality_fits(
         color=COLORS["ink"],
     )
     fig.tight_layout()
-    fig.savefig(output_path, dpi=220, bbox_inches="tight")
+    save_figure(fig, output_path)
     plt.close(fig)
 
 
@@ -1082,7 +1091,7 @@ def plot_periods_and_phases(
 
     fig.suptitle("Grand Within-Subject Rhythm Summary", fontsize=13.5, fontweight="bold", color=COLORS["ink"])
     fig.tight_layout()
-    fig.savefig(output_path, dpi=220, bbox_inches="tight")
+    save_figure(fig, output_path)
     plt.close(fig)
 
 
@@ -1237,6 +1246,23 @@ def _html_table(data: pd.DataFrame, columns: list[str]) -> str:
     )
 
 
+def _html_picture(stem: str, alt: str) -> str:
+    """Return an SVG-first HTML picture with a PNG fallback."""
+
+    return (
+        "<picture>"
+        f'<source srcset="{escape(stem)}.svg" type="image/svg+xml">'
+        f'<img src="{escape(stem)}.png" alt="{escape(alt)}" loading="lazy">'
+        "</picture>"
+    )
+
+
+def _write_html(path: Path, html: str) -> None:
+    """Write generated HTML without trailing whitespace."""
+
+    path.write_text("\n".join(line.rstrip() for line in html.splitlines()) + "\n", encoding="utf-8")
+
+
 def write_final_html_report(
     grand_dir: Path,
     metric_summary: pd.DataFrame,
@@ -1347,7 +1373,7 @@ def write_final_html_report(
 
   <h2>Pooled Circular Bimodality Fits</h2>
   <p>The histogram bars are the final pooled FDR-significant peak phases. The dashed curve is the one-component von Mises fit; the solid curve is the two-component mixture fit, with dotted component curves.</p>
-  <img src="grand_pooled_circular_bimodality_fits.png" alt="Pooled circular bimodality fits with one- and two-component von Mises curves">
+  {_html_picture("grand_pooled_circular_bimodality_fits", "Pooled circular bimodality fits with one- and two-component von Mises curves")}
   {_html_table(
       bic_rows,
       [
@@ -1367,11 +1393,11 @@ def write_final_html_report(
 
   <h2>Phase-Count Weighted PC Peak Density</h2>
   <p>This companion plot summarizes the same local-hour phase landscape with phase-count weighted smoothed circular densities.</p>
-  <img src="grand_pc_peak_density.png" alt="Phase-count weighted PC peak density">
+  {_html_picture("grand_pc_peak_density", "Phase-count weighted PC peak density")}
   {_html_table(density_modes, ["metric", "n_servers", "total_phases", "weighted_peak_hour", "weighted_density_peak", "kappa", "min_phases"])}
 
   <h2>Weighted Rhythm and Phase Summaries</h2>
-  <img src="grand_within_subject_summary.png" alt="Weighted within-subject period and phase summary">
+  {_html_picture("grand_within_subject_summary", "Weighted within-subject period and phase summary")}
   {_html_table(period_summary, ["metric", "n_servers", "weight_col", "total_valid_players", "weighted_best_period", "weighted_sd_best_period", "weighted_sem_best_period"])}
   {_html_table(phase_summary, ["metric", "n_servers", "weight_col", "total_players_analyzed", "total_fdr_significant", "weighted_fdr_fraction"])}
 
@@ -1394,16 +1420,272 @@ def write_final_html_report(
   {_html_table(key_metrics, ["metric", "n_servers", "weight_col", "weight_sum", "weighted_mean", "weighted_sd", "min", "max"])}
 
   <h2>PCA Loading Summaries</h2>
-  <img src="grand_performance_pca_loadings.png" alt="N-weighted performance PCA loadings">
-  <img src="grand_success_aware_pca_loadings.png" alt="N-weighted success-aware PCA loadings">
+  {_html_picture("grand_performance_pca_loadings", "N-weighted performance PCA loadings")}
+  {_html_picture("grand_success_aware_pca_loadings", "N-weighted success-aware PCA loadings")}
 
   <h2>Local-Hour Win Rate</h2>
-  <img src="grand_win_rate_by_local_hour.png" alt="N-weighted local-hour win rate">
+  {_html_picture("grand_win_rate_by_local_hour", "N-weighted local-hour win rate")}
 </main>
 </body>
 </html>
 """
-    (grand_dir / "grand_final_report.html").write_text(html, encoding="utf-8")
+    _write_html(grand_dir / "grand_final_report.html", html)
+
+
+def _artifact_href(path: Path, output_root: Path) -> str:
+    """Return an escaped report-relative artifact path."""
+
+    return escape(path.relative_to(output_root).as_posix(), quote=True)
+
+
+def _humanize_artifact_name(name: str) -> str:
+    """Turn a generated artifact stem into a compact display label."""
+
+    return name.replace("_", " ").replace("-", " ").title()
+
+
+def _html_output_picture(output_root: Path, directory: Path, stem: str) -> str:
+    """Return a linked SVG-first figure card for one output stem."""
+
+    svg_path = directory / f"{stem}.svg"
+    png_path = directory / f"{stem}.png"
+    preferred_path = svg_path if svg_path.exists() else png_path
+    fallback_path = png_path if png_path.exists() else svg_path
+    source = (
+        f'<source srcset="{_artifact_href(svg_path, output_root)}" type="image/svg+xml">'
+        if svg_path.exists()
+        else ""
+    )
+    label = _humanize_artifact_name(stem)
+    return f"""
+    <figure class="figure-card">
+      <a href="{_artifact_href(preferred_path, output_root)}">
+        <picture>
+          {source}
+          <img src="{_artifact_href(fallback_path, output_root)}" alt="{escape(label)}" loading="lazy">
+        </picture>
+      </a>
+      <figcaption>{escape(label)} · <a href="{_artifact_href(preferred_path, output_root)}">open editable figure</a></figcaption>
+    </figure>
+    """
+
+
+def _html_figure_gallery(output_root: Path, directory: Path) -> str:
+    """Return all non-duplicate generated figures from one output directory."""
+
+    stems = {path.stem for suffix in ("*.svg", "*.png") for path in directory.glob(suffix)}
+    alias = f"owls_vs_larks_circular_vm_{directory.name}"
+    if f"owls_vs_larks_circular_vm_pc1_{directory.name}" in stems:
+        stems.discard(alias)
+    if not stems:
+        return "<p>No figures found.</p>"
+    cards = [_html_output_picture(output_root, directory, stem) for stem in sorted(stems)]
+    return '<div class="figure-grid">' + "\n".join(cards) + "</div>"
+
+
+def _html_csv_preview(path: Path, output_root: Path, *, max_rows: int = 40) -> str:
+    """Return a collapsible preview and download link for one CSV artifact."""
+
+    href = _artifact_href(path, output_root)
+    try:
+        table = pd.read_csv(path, nrows=max_rows + 1)
+    except Exception as exc:
+        return f'<li><a href="{href}">{escape(path.name)}</a>: preview failed ({escape(str(exc))})</li>'
+
+    truncated = len(table) > max_rows
+    table = table.head(max_rows)
+    note = f"First {max_rows} rows shown." if truncated else f"{len(table)} row(s)."
+    table_html = table.to_html(
+        index=False,
+        border=0,
+        classes="data-table",
+        justify="left",
+        na_rep="",
+        float_format=lambda value: f"{value:.3f}",
+    )
+    return f"""
+    <details class="table-preview">
+      <summary>{escape(_humanize_artifact_name(path.stem))} <span>{escape(note)}</span></summary>
+      <p><a href="{href}">Download {escape(path.name)}</a></p>
+      <div class="table-scroll">{table_html}</div>
+    </details>
+    """
+
+
+def _html_artifact_links(directory: Path, output_root: Path) -> str:
+    """Return direct links to every generated artifact in a directory."""
+
+    files = sorted(path for path in directory.iterdir() if path.is_file())
+    if not files:
+        return "<p>No artifacts found.</p>"
+    links = []
+    for path in files:
+        size_kib = path.stat().st_size / 1024.0
+        links.append(
+            f'<li><a href="{_artifact_href(path, output_root)}">{escape(path.name)}</a> '
+            f'<span>({size_kib:,.1f} KiB)</span></li>'
+        )
+    return '<ul class="artifact-list">' + "\n".join(links) + "</ul>"
+
+
+def _html_output_section(output_root: Path, directory: Path, heading: str) -> str:
+    """Return figures, table previews, and downloads for one result directory."""
+
+    csv_previews = "\n".join(
+        _html_csv_preview(path, output_root) for path in sorted(directory.glob("*.csv"))
+    )
+    return f"""
+    <section id="{escape(directory.name.lower())}">
+      <h2>{escape(heading)}</h2>
+      <h3>Figures</h3>
+      {_html_figure_gallery(output_root, directory)}
+      <h3>Table Previews</h3>
+      {csv_previews or "<p>No CSV tables found.</p>"}
+      <details class="downloads">
+        <summary>All output files</summary>
+        {_html_artifact_links(directory, output_root)}
+      </details>
+    </section>
+    """
+
+
+def write_full_html_report(output_root: Path, server_dirs: list[Path], grand_dir: Path) -> Path:
+    """Write one SVG-first report covering GRAND and every included server."""
+
+    summary_path = output_root / "all_servers_summary.csv"
+    if not summary_path.exists():
+        summary_path = grand_dir / "grand_server_metrics.csv"
+    summary = pd.read_csv(summary_path) if summary_path.exists() else pd.DataFrame()
+    summary_html = (
+        _html_table(summary, list(summary.columns))
+        if not summary.empty
+        else "<p>No combined server summary found.</p>"
+    )
+
+    nav_links = ['<a href="#grand">GRAND</a>']
+    nav_links.extend(
+        f'<a href="#{escape(server_dir.name.lower())}">{escape(server_dir.name)}</a>'
+        for server_dir in server_dirs
+    )
+    sections = [_html_output_section(output_root, grand_dir, "GRAND Across-Server Analysis")]
+    sections.extend(
+        _html_output_section(output_root, server_dir, f"{server_dir.name} Server Analysis")
+        for server_dir in server_dirs
+    )
+
+    html = f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>League of Legends Full Rhythm Analysis Outputs</title>
+  <style>
+    :root {{
+      --ink: #264653;
+      --primary: #1d3557;
+      --secondary: #2a9d8f;
+      --accent: #e76f51;
+      --page-bg: #fcfbf8;
+      --panel: #f8f5ef;
+      --rule: #d9d1c8;
+    }}
+    * {{ box-sizing: border-box; }}
+    body {{
+      margin: 0;
+      background: var(--page-bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.45;
+    }}
+    main {{ max-width: 1560px; margin: 0 auto; padding: 28px 24px 64px; }}
+    h1, h2, h3 {{ color: var(--primary); line-height: 1.15; }}
+    h1 {{ margin: 0 0 8px; font-size: 2.15rem; }}
+    h2 {{ margin-top: 44px; padding-top: 24px; border-top: 2px solid var(--rule); }}
+    h3 {{ margin-top: 28px; }}
+    a {{ color: var(--primary); }}
+    nav {{
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 22px 0;
+      padding: 10px;
+      background: rgba(248, 245, 239, 0.96);
+      border: 1px solid var(--rule);
+    }}
+    nav a {{ padding: 4px 9px; text-decoration: none; font-weight: 650; }}
+    .callout {{
+      max-width: 980px;
+      padding: 14px 16px;
+      background: var(--panel);
+      border-left: 4px solid var(--accent);
+    }}
+    .figure-grid {{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(520px, 100%), 1fr));
+      gap: 18px;
+    }}
+    .figure-card {{
+      margin: 0;
+      padding: 10px;
+      background: white;
+      border: 1px solid var(--rule);
+    }}
+    .figure-card img {{ display: block; width: 100%; height: auto; }}
+    figcaption {{ margin-top: 8px; font-size: 0.9rem; }}
+    details {{
+      margin: 10px 0;
+      background: white;
+      border: 1px solid var(--rule);
+    }}
+    summary {{
+      cursor: pointer;
+      padding: 10px 12px;
+      color: var(--primary);
+      background: var(--panel);
+      font-weight: 700;
+    }}
+    summary span {{ color: var(--ink); font-weight: 400; }}
+    details p, details .table-scroll, details ul {{ margin: 12px; }}
+    .table-scroll {{ overflow-x: auto; }}
+    .data-table {{
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.86rem;
+      background: white;
+    }}
+    .data-table th, .data-table td {{
+      border-bottom: 1px solid var(--rule);
+      padding: 6px 7px;
+      text-align: left;
+      vertical-align: top;
+      white-space: nowrap;
+    }}
+    .data-table th {{ color: var(--primary); background: var(--panel); }}
+    .artifact-list {{ columns: 2 320px; }}
+    .artifact-list li {{ break-inside: avoid; margin-bottom: 4px; }}
+    .artifact-list span {{ color: #667; font-size: 0.85rem; }}
+  </style>
+</head>
+<body>
+<main>
+  <h1>League of Legends Full Rhythm Analysis Outputs</h1>
+  <p class="callout">Figures prefer editable SVG, with PNG fallback for compatibility. Click any figure to open its editable source. Table previews are capped at 40 rows; every complete CSV and generated artifact is linked in its section.</p>
+  <nav>{"".join(nav_links)}</nav>
+  <section id="summary">
+    <h2>All-Server Run Summary</h2>
+    <div class="table-scroll">{summary_html}</div>
+  </section>
+  {"".join(sections)}
+</main>
+</body>
+</html>
+"""
+    report_path = output_root / "full_analysis_report.html"
+    _write_html(report_path, html)
+    return report_path
 
 
 def run_grand_analysis(
@@ -1510,11 +1792,13 @@ def run_grand_analysis(
         density_modes,
         pooled_bimodality,
     )
+    full_report = write_full_html_report(output_root, server_dirs, grand_dir)
 
     return {
         "servers": len(server_dirs),
         "grand_dir": str(grand_dir),
-        "figures": len(list(grand_dir.glob("*.png"))),
+        "full_report": str(full_report),
+        "figures": len(list(grand_dir.glob("*.svg"))),
     }
 
 
@@ -1554,7 +1838,10 @@ def main() -> int:
         platforms=args.platform,
         clean=not args.keep_existing,
     )
-    print(f"Grand analysis complete: {result['servers']} servers, {result['figures']} figures")
+    print(
+        f"Grand analysis complete: {result['servers']} servers, {result['figures']} figures, "
+        f"full report: {result['full_report']}"
+    )
     return 0
 
 

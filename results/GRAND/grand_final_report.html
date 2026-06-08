@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>League of Legends Grand Rhythm Analysis</title>
+  <style>
+    :root {
+      --ink: #264653;
+      --primary: #1d3557;
+      --accent: #e76f51;
+      --page-bg: #fcfbf8;
+      --panel: #f8f5ef;
+      --rule: #d9d1c8;
+    }
+    body {
+      margin: 0;
+      background: var(--page-bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.45;
+    }
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 36px 28px 56px;
+    }
+    h1, h2, h3 {
+      color: var(--primary);
+      line-height: 1.15;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 2.1rem;
+    }
+    h2 {
+      margin-top: 34px;
+      padding-top: 18px;
+      border-top: 1px solid var(--rule);
+    }
+    p {
+      max-width: 900px;
+    }
+    .lead {
+      font-size: 1.05rem;
+    }
+    .callout {
+      background: var(--panel);
+      border-left: 4px solid var(--accent);
+      padding: 14px 16px;
+      margin: 20px 0;
+    }
+    img {
+      width: 100%;
+      height: auto;
+      display: block;
+      border: 1px solid var(--rule);
+      background: white;
+      margin: 14px 0 22px;
+    }
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 24px;
+      font-size: 0.92rem;
+      background: white;
+    }
+    .data-table th, .data-table td {
+      border-bottom: 1px solid var(--rule);
+      padding: 7px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .data-table th {
+      background: var(--panel);
+      color: var(--primary);
+      font-weight: 700;
+    }
+    code {
+      background: var(--panel);
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>League of Legends Grand Rhythm Analysis</h1>
+  <p class="lead">Final across-server analysis using N-aware weighting. The headline circular test pools FDR-significant player peak phases from server-metric cells with at least 20 significant phases.</p>
+
+  <div class="callout">
+    <strong>Final bimodality result:</strong> PC1 and PC2 both prefer a two-component circular von Mises model by BIC in the pooled final data.
+  </div>
+
+  <h2>Pooled Circular Bimodality Fits</h2>
+  <p>The histogram bars are the final pooled FDR-significant peak phases. The dashed curve is the one-component von Mises fit; the solid curve is the two-component mixture fit, with dotted component curves.</p>
+  <picture><source srcset="grand_pooled_circular_bimodality_fits.svg" type="image/svg+xml"><img src="grand_pooled_circular_bimodality_fits.png" alt="Pooled circular bimodality fits with one- and two-component von Mises curves" loading="lazy"></picture>
+  <table class="dataframe data-table">
+  <thead>
+    <tr style="text-align: left;">
+      <th>metric</th>
+      <th>n_servers</th>
+      <th>n_phases</th>
+      <th>preferred</th>
+      <th>vm1_bic</th>
+      <th>vm2_bic</th>
+      <th>delta_bic_1_minus_2</th>
+      <th>component_1_h</th>
+      <th>component_2_h</th>
+      <th>component_1_weight</th>
+      <th>component_2_weight</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>PC1</td>
+      <td>8</td>
+      <td>1734</td>
+      <td>2-component</td>
+      <td>6324.300</td>
+      <td>6299.787</td>
+      <td>24.514</td>
+      <td>21.377</td>
+      <td>7.371</td>
+      <td>0.615</td>
+      <td>0.385</td>
+    </tr>
+    <tr>
+      <td>PC2</td>
+      <td>7</td>
+      <td>1466</td>
+      <td>2-component</td>
+      <td>5358.682</td>
+      <td>5330.790</td>
+      <td>27.892</td>
+      <td>9.881</td>
+      <td>20.073</td>
+      <td>0.639</td>
+      <td>0.361</td>
+    </tr>
+  </tbody>
+</table>
+
+  <h2>Phase-Count Weighted PC Peak Density</h2>
+  <p>This companion plot summarizes the same local-hour phase landscape with phase-count weighted smoothed circular densities.</p>
+  <picture><source srcset="grand_pc_peak_density.svg" type="image/svg+xml"><img src="grand_pc_peak_density.png" alt="Phase-count weighted PC peak density" loading="lazy"></picture>
+  <table class="dataframe data-table">
+  <thead>
+    <tr style="text-align: left;">
+      <th>metric</th>
+      <th>n_servers</th>
+      <th>total_phases</th>
+      <th>weighted_peak_hour</th>
+      <th>weighted_density_peak</th>
+      <th>kappa</th>
+      <th>min_phases</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>PC1</td>
+      <td>8</td>
+      <td>1734</td>
+      <td>22.200</td>
+      <td>0.053</td>
+      <td>4.000</td>
+      <td>20</td>
+    </tr>
+    <tr>
+      <td>PC2</td>
+      <td>7</td>
+      <td>1466</td>
+      <td>10.400</td>
+      <td>0.052</td>
+      <td>4.000</td>
+      <td>20</td>
+    </tr>
+  </tbody>
+</table>
+
+  <h2>Weighted Rhythm and Phase Summaries</h2>
+  <picture><source srcset="grand_within_subject_summary.svg" type="image/svg+xml"><img src="grand_within_subject_summary.png" alt="Weighted within-subject period and phase summary" loading="lazy"></picture>
+  <table class="dataframe data-table">
+  <thead>
+    <tr style="text-align: left;">
+      <th>metric</th>
+      <th>n_servers</th>
+      <th>weight_col</th>
+      <th>total_valid_players</th>
+      <th>weighted_best_period</th>
+      <th>weighted_sd_best_period</th>
+      <th>weighted_sem_best_period</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>PC1</td>
+      <td>7</td>
+      <td>valid_players</td>
+      <td>7000</td>
+      <td>24.000</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <td>PC2</td>
+      <td>7</td>
+      <td>valid_players</td>
+      <td>7000</td>
+      <td>24.000</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <td>DeltaMMR</td>
+      <td>7</td>
+      <td>valid_players</td>
+      <td>7000</td>
+      <td>24.000</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+  </tbody>
+</table>
+  <table class="dataframe data-table">
+  <thead>
+    <tr style="text-align: left;">
+      <th>metric</th>
+      <th>n_servers</th>
+      <th>weight_col</th>
+      <th>total_players_analyzed</th>
+      <th>total_fdr_significant</th>
+      <th>weighted_fdr_fraction</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>PC1</td>
+      <td>8</td>
+      <td>players_analyzed</td>
+      <td>8000</td>
+      <td>1734</td>
+      <td>0.217</td>
+    </tr>
+    <tr>
+      <td>PC2</td>
+      <td>8</td>
+      <td>players_analyzed</td>
+      <td>8000</td>
+      <td>1480</td>
+      <td>0.185</td>
+    </tr>
+    <tr>
+      <td>DeltaMMR</td>
+      <td>8</td>
+      <td>players_analyzed</td>
+      <td>8000</td>
+      <td>26</td>
+      <td>0.003</td>
+    </tr>
+  </tbody>
+</table>
+
+  <h2>Circular Model Preference Across Servers</h2>
+  <table class="dataframe data-table">
+  <thead>
+    <tr style="text-align: left;">
+      <th>metric</th>
+      <th>n_servers</th>
+      <th>weight_col</th>
+      <th>total_fdr_significant</th>
+      <th>fit_servers</th>
+      <th>skipped_servers</th>
+      <th>preferred_1_component_phases</th>
+      <th>preferred_2_component_phases</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>PC1</td>
+      <td>8</td>
+      <td>n_fdr_significant</td>
+      <td>1734</td>
+      <td>8</td>
+      <td>0</td>
+      <td>845</td>
+      <td>889</td>
+    </tr>
+    <tr>
+      <td>PC2</td>
+      <td>8</td>
+      <td>n_fdr_significant</td>
+      <td>1480</td>
+      <td>7</td>
+      <td>1</td>
+      <td>707</td>
+      <td>759</td>
+    </tr>
+    <tr>
+      <td>DeltaMMR</td>
+      <td>8</td>
+      <td>n_fdr_significant</td>
+      <td>26</td>
+      <td>0</td>
+      <td>8</td>
+      <td>0</td>
+      <td>0</td>
+    </tr>
+  </tbody>
+</table>
+
+  <h2>Key N-Weighted Server Metrics</h2>
+  <table class="dataframe data-table">
+  <thead>
+    <tr style="text-align: left;">
+      <th>metric</th>
+      <th>n_servers</th>
+      <th>weight_col</th>
+      <th>weight_sum</th>
+      <th>weighted_mean</th>
+      <th>weighted_sd</th>
+      <th>min</th>
+      <th>max</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>target_best_period</td>
+      <td>8</td>
+      <td>server_n_records</td>
+      <td>146937582.000</td>
+      <td>23.681</td>
+      <td>1.931</td>
+      <td>12.000</td>
+      <td>24.000</td>
+    </tr>
+    <tr>
+      <td>win_rate_best_period</td>
+      <td>8</td>
+      <td>server_n_records</td>
+      <td>146937582.000</td>
+      <td>22.553</td>
+      <td>5.433</td>
+      <td>8.000</td>
+      <td>33.000</td>
+    </tr>
+    <tr>
+      <td>performance_pc1_explained</td>
+      <td>8</td>
+      <td>server_n_records</td>
+      <td>146937582.000</td>
+      <td>0.631</td>
+      <td>0.054</td>
+      <td>0.430</td>
+      <td>0.675</td>
+    </tr>
+    <tr>
+      <td>performance_pc2_explained</td>
+      <td>8</td>
+      <td>server_n_records</td>
+      <td>146937582.000</td>
+      <td>0.192</td>
+      <td>0.026</td>
+      <td>0.156</td>
+      <td>0.256</td>
+    </tr>
+    <tr>
+      <td>performance_pc3_explained</td>
+      <td>8</td>
+      <td>server_n_records</td>
+      <td>146937582.000</td>
+      <td>0.087</td>
+      <td>0.011</td>
+      <td>0.078</td>
+      <td>0.138</td>
+    </tr>
+    <tr>
+      <td>success_pc1_win_rate_loading</td>
+      <td>8</td>
+      <td>server_n_records</td>
+      <td>146937582.000</td>
+      <td>0.327</td>
+      <td>0.095</td>
+      <td>0.039</td>
+      <td>0.389</td>
+    </tr>
+    <tr>
+      <td>success_pc2_win_rate_loading</td>
+      <td>8</td>
+      <td>server_n_records</td>
+      <td>146937582.000</td>
+      <td>0.170</td>
+      <td>0.103</td>
+      <td>-0.045</td>
+      <td>0.355</td>
+    </tr>
+    <tr>
+      <td>success_pc3_win_rate_loading</td>
+      <td>8</td>
+      <td>server_n_records</td>
+      <td>146937582.000</td>
+      <td>0.326</td>
+      <td>0.218</td>
+      <td>0.125</td>
+      <td>0.966</td>
+    </tr>
+    <tr>
+      <td>pc1_phase_fdr_significant</td>
+      <td>8</td>
+      <td>pc1_phase_players</td>
+      <td>8000.000</td>
+      <td>216.750</td>
+      <td>195.742</td>
+      <td>93.000</td>
+      <td>712.000</td>
+    </tr>
+    <tr>
+      <td>pc2_phase_fdr_significant</td>
+      <td>8</td>
+      <td>pc2_phase_players</td>
+      <td>8000.000</td>
+      <td>185.000</td>
+      <td>232.593</td>
+      <td>14.000</td>
+      <td>759.000</td>
+    </tr>
+    <tr>
+      <td>deltammr_phase_fdr_significant</td>
+      <td>8</td>
+      <td>deltammr_phase_players</td>
+      <td>8000.000</td>
+      <td>3.250</td>
+      <td>1.854</td>
+      <td>1.000</td>
+      <td>6.000</td>
+    </tr>
+  </tbody>
+</table>
+
+  <h2>PCA Loading Summaries</h2>
+  <picture><source srcset="grand_performance_pca_loadings.svg" type="image/svg+xml"><img src="grand_performance_pca_loadings.png" alt="N-weighted performance PCA loadings" loading="lazy"></picture>
+  <picture><source srcset="grand_success_aware_pca_loadings.svg" type="image/svg+xml"><img src="grand_success_aware_pca_loadings.png" alt="N-weighted success-aware PCA loadings" loading="lazy"></picture>
+
+  <h2>Local-Hour Win Rate</h2>
+  <picture><source srcset="grand_win_rate_by_local_hour.svg" type="image/svg+xml"><img src="grand_win_rate_by_local_hour.png" alt="N-weighted local-hour win rate" loading="lazy"></picture>
+</main>
+</body>
+</html>

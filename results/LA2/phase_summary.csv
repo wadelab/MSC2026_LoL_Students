@@ -1,0 +1,4 @@
+metric,players_analyzed,nominal_significant,fdr_significant,alpha,correction
+PC1,1000,239,94,0.05,Benjamini-Hochberg FDR
+PC2,1000,176,14,0.05,Benjamini-Hochberg FDR
+DeltaMMR,1000,100,1,0.05,Benjamini-Hochberg FDR

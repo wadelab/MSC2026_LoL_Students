@@ -1,0 +1,4 @@
+metric,n_fdr_significant,status,preferred,vm1_bic,vm2_bic,component_peak_1_h,component_peak_2_h
+PC1,712,fit,2-component,2609.0767174937514,2496.586787805343,8.186063382995936,21.479760645052803
+PC2,759,fit,2-component,2794.8197553760674,2709.5794370803615,20.73618422218327,9.476075388250763
+DeltaMMR,2,skipped,,,,,

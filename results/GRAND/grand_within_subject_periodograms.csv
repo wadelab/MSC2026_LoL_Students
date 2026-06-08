@@ -1,0 +1,4 @@
+metric,n_servers,weight_col,weight_sum,total_valid_players,weighted_best_period,weighted_sd_best_period,weighted_sem_best_period,weighted_best_power
+PC1,7,valid_players,7000.0,7000,24.0,0.0,0.0,0.004998656670869914
+PC2,7,valid_players,7000.0,7000,24.0,0.0,0.0,0.004222993908053514
+DeltaMMR,7,valid_players,7000.0,7000,24.0,0.0,0.0,0.002401455780743929

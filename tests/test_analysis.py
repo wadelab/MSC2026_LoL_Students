@@ -6,20 +6,24 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 import duckdb
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy.stats import vonmises
 
-from grand_analysis import ANALYSIS_PLATFORMS
+from grand_analysis import ANALYSIS_PLATFORMS, write_full_html_report
 from riot_analysis import (
     AGG_COL_MAP,
     AnalysisConfig,
     COLAB_RIOT_DUCKDB,
+    configure_plot_style,
     connect_analysis_database,
+    existing_database_is_usable,
     fit_vonmises_2comp,
     load_hourly_win_rate,
     load_top_players,
     resolve_analysis_db_file,
+    save_figure,
 )
 from server_timezones import utc_ms_to_local_datetime
 
@@ -72,6 +76,57 @@ class AnalysisTests(unittest.TestCase):
                 self.assertEqual(reused.execute("SELECT COUNT(*) FROM hourly_agg").fetchone()[0], 1)
             finally:
                 reused.close()
+
+    def test_cache_validation_does_not_scan_raw_parquet_view(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            parquet_path = temp_path / "raw.parquet"
+            db_path = temp_path / "riot_local.duckdb"
+            conn = duckdb.connect(str(db_path))
+            conn.execute(f"COPY (SELECT 1 AS value) TO '{parquet_path}' (FORMAT PARQUET)")
+            conn.execute(f"CREATE VIEW riotData AS SELECT * FROM read_parquet('{parquet_path}')")
+            aggregate_columns = ", ".join(
+                f"{column} DOUBLE" for column in sorted(set(AGG_COL_MAP.values()))
+            )
+            conn.execute(
+                f"CREATE TABLE hourly_agg (platformid VARCHAR, hour_idx BIGINT, "
+                f"n BIGINT, {aggregate_columns})"
+            )
+            conn.close()
+            parquet_path.unlink()
+
+            self.assertTrue(existing_database_is_usable(db_path))
+
+    def test_svg_first_full_report_links_editable_figures_and_all_servers(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            output_root = Path(temp_dir)
+            grand_dir = output_root / "GRAND"
+            server_dir = output_root / "EUW1"
+            grand_dir.mkdir()
+            server_dir.mkdir()
+            pd.DataFrame([{"platform": "EUW1", "status": "ok"}]).to_csv(
+                output_root / "all_servers_summary.csv",
+                index=False,
+            )
+            pd.DataFrame([{"metric": "PC1", "value": 1.0}]).to_csv(
+                server_dir / "phase_summary.csv",
+                index=False,
+            )
+
+            configure_plot_style()
+            fig, ax = plt.subplots()
+            ax.set_title("Editable title")
+            save_figure(fig, server_dir / "phase_landscape.png")
+            plt.close(fig)
+
+            report_path = write_full_html_report(output_root, [server_dir], grand_dir)
+            report = report_path.read_text(encoding="utf-8")
+            svg = (server_dir / "phase_landscape.svg").read_text(encoding="utf-8")
+
+            self.assertTrue((server_dir / "phase_landscape.png").exists())
+            self.assertIn("EUW1 Server Analysis", report)
+            self.assertIn("EUW1/phase_landscape.svg", report)
+            self.assertIn("<text", svg)
 
     def test_fixed_offset_datetime_has_correct_timezone(self) -> None:
         scalar = utc_ms_to_local_datetime(0, "EUW1")

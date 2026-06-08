@@ -1,0 +1,6 @@
+metric,phase_local_peak,correction,alpha
+DeltaMMR,10.857126805353982,Benjamini-Hochberg FDR,0.05
+DeltaMMR,9.474974287001203,Benjamini-Hochberg FDR,0.05
+DeltaMMR,1.0451396311789694,Benjamini-Hochberg FDR,0.05
+DeltaMMR,2.9483424953381387,Benjamini-Hochberg FDR,0.05
+DeltaMMR,5.309544972819797,Benjamini-Hochberg FDR,0.05

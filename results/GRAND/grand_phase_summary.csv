@@ -1,0 +1,4 @@
+metric,n_servers,weight_col,weight_sum,total_players_analyzed,total_fdr_significant,weighted_fdr_fraction,weighted_sd_fdr_fraction,weighted_sem_fdr_fraction
+PC1,8,players_analyzed,8000.0,8000,1734,0.21675,0.19574201771719835,0.06920525404548414
+PC2,8,players_analyzed,8000.0,8000,1480,0.185,0.23259299215582577,0.08223404100492693
+DeltaMMR,8,players_analyzed,8000.0,8000,26,0.00325,0.0018540496217739157,0.0006555055301063447

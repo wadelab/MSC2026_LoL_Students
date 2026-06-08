@@ -218,7 +218,8 @@ def main() -> int:
         )
         print(
             f"Grand analysis complete: {result['servers']} server(s), "
-            f"{result['figures']} figure(s), output: {result['grand_dir']}",
+            f"{result['figures']} figure(s), output: {result['grand_dir']}, "
+            f"full report: {result['full_report']}",
             flush=True,
         )
         return 0
@@ -290,7 +291,8 @@ def main() -> int:
                 )
                 print(
                     f"Grand analysis complete: {result['servers']} server(s), "
-                    f"{result['figures']} figure(s), output: {result['grand_dir']}",
+                    f"{result['figures']} figure(s), output: {result['grand_dir']}, "
+                    f"full report: {result['full_report']}",
                     flush=True,
                 )
             except Exception as exc:

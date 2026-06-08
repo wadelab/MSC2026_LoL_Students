@@ -115,6 +115,7 @@ def configure_plot_style() -> None:
             "grid.linestyle": "--",
             "grid.alpha": 0.28,
             "savefig.facecolor": "#fcfbf8",
+            "svg.fonttype": "none",
         }
     )
 
@@ -335,7 +336,7 @@ def ensure_hourly_agg_table(
 
 
 def existing_database_is_usable(db_file: str | Path) -> bool:
-    """Return True when an existing DuckDB has readable raw and aggregate relations."""
+    """Return True when an existing DuckDB has the required raw and aggregate relations."""
 
     required_columns = {"platformid", "hour_idx", "n"} | {
         col.lower() for col in AGG_COL_MAP.values()
@@ -343,8 +344,12 @@ def existing_database_is_usable(db_file: str | Path) -> bool:
     try:
         conn = duckdb.connect(str(db_file), read_only=True)
         try:
-            conn.execute("SELECT 1 FROM riotData LIMIT 1").fetchone()
-            conn.execute("SELECT 1 FROM hourly_agg LIMIT 1").fetchone()
+            # Querying riotData here can trigger a slow remote Parquet read in Colab.
+            if not all(
+                duckdb_relation_exists(conn, relation_name)
+                for relation_name in ("riotData", "hourly_agg")
+            ):
+                return False
             return required_columns.issubset(duckdb_relation_columns(conn, "hourly_agg"))
         finally:
             conn.close()
@@ -1148,6 +1153,21 @@ def save_table(table: pd.DataFrame, path: Path) -> None:
     table.to_csv(path, index=False)
 
 
+def save_figure(fig: Any, output_path: str | Path, *, dpi: int = 220) -> tuple[Path, Path]:
+    """Save editable SVG and PNG fallback versions of a Matplotlib figure."""
+
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    stem = output_path.with_suffix("")
+    png_path = stem.with_suffix(".png")
+    svg_path = stem.with_suffix(".svg")
+    fig.savefig(png_path, dpi=dpi, bbox_inches="tight")
+    fig.savefig(svg_path, format="svg", bbox_inches="tight")
+    svg_text = svg_path.read_text(encoding="utf-8")
+    svg_path.write_text("\n".join(line.rstrip() for line in svg_text.splitlines()) + "\n", encoding="utf-8")
+    return png_path, svg_path
+
+
 def plot_win_rate(
     hourly_win: pd.DataFrame,
     win_summary: dict[str, Any],
@@ -1213,7 +1233,7 @@ def plot_win_rate(
 
     fig.suptitle(f"Standalone Win-Rate Rhythm: PLATFORMID={config.platform}", fontsize=13.5, fontweight="bold", color=COLORS["ink"])
     fig.tight_layout()
-    fig.savefig(output_dir / "win_rate_rhythm.png", dpi=220, bbox_inches="tight")
+    save_figure(fig, output_dir / "win_rate_rhythm.png")
     plt.close(fig)
 
 
@@ -1234,7 +1254,7 @@ def plot_loadings(loadings: pd.DataFrame, title: str, output_path: Path, compone
         style_axes(ax, grid_axis="x")
     fig.suptitle(title, fontsize=13.5, fontweight="bold", color=COLORS["ink"])
     fig.tight_layout()
-    fig.savefig(output_path, dpi=220, bbox_inches="tight")
+    save_figure(fig, output_path)
     plt.close(fig)
 
 
@@ -1272,7 +1292,7 @@ def plot_player_periodograms(
         style_axes(ax)
     fig.suptitle(f"Incoherent averaged periodograms: {config.platform}", y=1.03, fontsize=13.5, fontweight="bold", color=COLORS["ink"])
     fig.tight_layout()
-    fig.savefig(output_dir / "within_subject_periodograms.png", dpi=220, bbox_inches="tight")
+    save_figure(fig, output_dir / "within_subject_periodograms.png")
     plt.close(fig)
     save_table(pd.DataFrame(rows), output_dir / "within_subject_periodogram_summary.csv")
 
@@ -1336,7 +1356,7 @@ def plot_phase_results(
 
     fig.suptitle(f"Circadian Phase Landscape: {config.platform}", fontsize=13.5, fontweight="bold", color=COLORS["ink"])
     fig.tight_layout()
-    fig.savefig(output_dir / "phase_landscape.png", dpi=220, bbox_inches="tight")
+    save_figure(fig, output_dir / "phase_landscape.png")
     plt.close(fig)
     save_table(pd.DataFrame(summary_rows), output_dir / "phase_summary.csv")
 
@@ -1406,9 +1426,9 @@ def plot_circular_results(
         fig.suptitle(f"Owls vs Larks Circular Modality: {config.platform}\nMetric: {label} Peak Local Hour", fontsize=13.5, fontweight="bold", color=COLORS["ink"])
         fig.tight_layout()
         fig_path = output_dir / f"owls_vs_larks_circular_vm_{label.lower()}_{config.platform}.png"
-        fig.savefig(fig_path, dpi=320, bbox_inches="tight")
+        save_figure(fig, fig_path, dpi=320)
         if label == "PC1":
-            fig.savefig(output_dir / f"owls_vs_larks_circular_vm_{config.platform}.png", dpi=320, bbox_inches="tight")
+            save_figure(fig, output_dir / f"owls_vs_larks_circular_vm_{config.platform}.png", dpi=320)
         plt.close(fig)
 
     save_table(pd.DataFrame(summary_rows), output_dir / "circular_modality_summary.csv")

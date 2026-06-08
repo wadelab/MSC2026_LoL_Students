@@ -14,8 +14,9 @@ This repository contains:
   - `Parquet_longerAnalyses_May_26.py`
   - `server_timezones.py`
 
-Manuscript source, rendered manuscript files, local DuckDB caches, and generated
-result folders are intentionally not included.
+Manuscript source, rendered manuscript files, and local DuckDB caches are
+intentionally not included. Canonical generated analysis outputs are tracked
+under `results/`.
 
 ## Setup
 
@@ -122,6 +123,11 @@ To regenerate only the GRAND report from existing per-server outputs:
 ```bash
 python Parquet_longerAnalyses_May_26.py --grand-only
 ```
+
+Analysis plots are written as editable SVG files with PNG fallbacks. Each full
+or GRAND-only run also writes `results/full_analysis_report.html`, which
+collects the across-server GRAND analysis and every included server's figures,
+table previews, and downloadable output files.
 
 ## Focused Teaching Notebooks
 
